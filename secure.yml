@@ -69,7 +69,7 @@
 
     - name: Install required packages
       apt: state=installed pkg={{ item }}
-      with_items: ubuntu_common_required_packages
+      with_items: "{{ ubuntu_common_required_packages }}"
 
     - name: Adjust APT update intervals
       copy: src=conf/apt_periodic dest=/etc/apt/apt.conf.d/10periodic
