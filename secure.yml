@@ -1,0 +1,136 @@
+---
+- name: Secure your server
+  hosts: all
+  become: 'yes'
+  become_method: sudo
+  vars:
+    ubuntu_ssh_port: 21222
+    sudoers:
+      - deploy
+    ubuntu_common_required_packages:
+      - ufw
+      - fail2ban
+      - unattended-upgrades
+      - logwatch
+  handlers:
+    - name: Restart ssh
+      service: name=ssh state=restarted
+    - name: Restart postfix
+      service: name=postfix state=restarted
+    - name: Restart fail2ban
+      service: name=fail2ban state=restarted
+  tasks:
+    - name: Make sure the host is in the hosts file to stop annoying error messages
+      lineinfile: dest=/etc/hosts
+                  regexp="^127.0.0.1\s*{{ ansible_fqdn }}"
+                  line="127.0.0.1\t{{ ansible_fqdn }}"
+                  state=present
+
+    - name: apt-get update
+      apt: 
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: apt-get upgrade
+      shell: apt-get -y upgrade
+
+    - name: Make sure we have a 'wheel' group
+      group:
+        name: wheel
+        state: present
+
+    - name: Allow 'wheel' group to have passwordless sudo
+      lineinfile:
+        dest: /etc/sudoers
+        state: present
+        regexp: '^%wheel'
+        line: '%wheel ALL=(ALL) NOPASSWD: ALL'
+
+    - name: Add sudoers users to wheel group
+      user:
+        name: "{{ item }}"
+        shell: /bin/bash
+        groups: wheel
+        append: yes
+      with_items: "{{ sudoers }}"
+
+    - name: add authorized key for user
+      authorized_key:
+        user: "{{ item }}"
+        key: "{{ lookup('file', 'keys/default_key.pub' ) }}"
+        state: present
+        exclusive: yes
+      with_items: "{{ sudoers }}"
+
+    - name: Install required packages
+      apt: state=installed pkg={{ item }}
+      with_items: ubuntu_common_required_packages
+
+    - name: Adjust APT update intervals
+      copy: src=conf/apt_periodic dest=/etc/apt/apt.conf.d/10periodic
+#SSH
+    - name: Change ssh port
+      lineinfile: dest=/etc/ssh/sshd_config
+                  regexp="^Port\s"
+                  line="Port {{ ubuntu_ssh_port }}"
+                  state=present
+      notify: Restart ssh
+
+    - name: Disallow password authentication
+      lineinfile: dest=/etc/ssh/sshd_config
+                  regexp="^PasswordAuthentication"
+                  line="PasswordAuthentication no"
+                  state=present
+      notify: Restart ssh
+
+    - name: Disallow root SSH access
+      lineinfile: dest=/etc/ssh/sshd_config
+                  regexp="^PermitRootLogin"
+                  line="PermitRootLogin no"
+                  state=present
+      notify: Restart ssh
+#Firewall
+    - name: Setup ufw
+      ufw: state=enabled policy=deny
+
+    - name: Allow ssh traffic
+      ufw: rule=allow port={{ ubuntu_ssh_port }} proto=tcp
+
+#Fail2Ban
+    - name: Configure Fail2Ban
+      notify: Restart fail2ban
+      template:
+        src: conf/fail2ban/jail.local
+        dest: /etc/fail2ban/jail.local
+
+    - name: Add fail2ban action for ufw-ssh
+      notify: Restart fail2ban
+      copy:
+        src: conf/fail2ban/action.d/ufw-ssh.conf
+        dest: /etc/fail2ban/action.d/ufw-ssh.conf
+
+# Postfix
+    - name: Set up Postfix to relay mail
+      debconf: name=postfix
+               question='{{ item.question }}'
+               value='{{ item.value }}'
+               vtype='{{ item.vtype }}'
+      with_items:
+        - { question: 'postfix/mailname', value: '{{ ansible_fqdn }}', vtype: 'string' }
+        - { question: 'postfix/main_mailer_type', value: 'Internet Site', vtype: 'string' }
+      notify: Restart postfix
+
+    - name: Configure postfix for localhost only
+      lineinfile: dest=/etc/postfix/main.cf
+                  regexp="^inet_interfaces"
+                  line="inet_interfaces = loopback-only"
+                  state=present
+      notify: Restart postfix
+
+#Logwatch
+    - name: Email log summary daily
+      lineinfile: dest=/etc/cron.daily/00logwatch
+                  regexp="^/usr/sbin/logwatch"
+                  line="/usr/sbin/logwatch --output mail --mailto {{ ubuntu_logwatch_email }} --detail high --format html "
+                  state=present create=yes
+
