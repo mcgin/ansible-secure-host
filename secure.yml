@@ -39,6 +39,11 @@
         name: wheel
         state: present
 
+    - name: Make sure we have a 'sshlogin' group
+      group:
+        name: sshlogin
+        state: present
+
     - name: Allow 'wheel' group to have passwordless sudo
       lineinfile:
         dest: /etc/sudoers
@@ -50,7 +55,7 @@
       user:
         name: "{{ item }}"
         shell: /bin/bash
-        groups: wheel
+        groups: wheel,sshlogin
         append: yes
       with_items: "{{ sudoers }}"
 
@@ -87,6 +92,34 @@
       lineinfile: dest=/etc/ssh/sshd_config
                   regexp="^PermitRootLogin"
                   line="PermitRootLogin no"
+                  state=present
+      notify: Restart ssh
+
+    - name: Only allow sshlogin group
+      lineinfile: dest=/etc/ssh/sshd_config
+                  regexp="^AllowGroups"
+                  line="AllowGroups sshlogin"
+                  state=present
+      notify: Restart ssh
+
+    - name: Set sshd UseDNS to no
+      lineinfile: dest=/etc/ssh/sshd_config
+                  regexp="^UseDNS"
+                  line="UseDNS no"
+                  state=present
+      notify: Restart ssh
+
+    - name: Lower sshd login grace
+      lineinfile: dest=/etc/ssh/sshd_config
+                  regexp="^LoginGraceTime"
+                  line="LoginGraceTime 20"
+                  state=present
+      notify: Restart ssh
+
+    - name: Disable X11Forwarding
+      lineinfile: dest=/etc/ssh/sshd_config
+                  regexp="^X11Forwarding"
+                  line="X11Forwarding no"
                   state=present
       notify: Restart ssh
 #Firewall
