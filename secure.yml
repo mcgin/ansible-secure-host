@@ -119,6 +119,7 @@
         - { question: 'postfix/mailname', value: '{{ ansible_fqdn }}', vtype: 'string' }
         - { question: 'postfix/main_mailer_type', value: 'Internet Site', vtype: 'string' }
       notify: Restart postfix
+      when: ubuntu_logwatch_email is defined
 
     - name: Configure postfix for localhost only
       lineinfile: dest=/etc/postfix/main.cf
@@ -126,6 +127,7 @@
                   line="inet_interfaces = loopback-only"
                   state=present
       notify: Restart postfix
+      when: ubuntu_logwatch_email is defined
 
 #Logwatch
     - name: Email log summary daily
@@ -133,4 +135,5 @@
                   regexp="^/usr/sbin/logwatch"
                   line="/usr/sbin/logwatch --output mail --mailto {{ ubuntu_logwatch_email }} --detail high --format html "
                   state=present create=yes
+      when: ubuntu_logwatch_email is defined
 
