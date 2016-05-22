@@ -72,7 +72,7 @@
       with_items: "{{ ubuntu_common_required_packages }}"
 
     - name: Adjust APT update intervals
-      copy: src=conf/apt_periodic dest=/etc/apt/apt.conf.d/10periodic
+      copy: src=files/apt_periodic dest=/etc/apt/apt.conf.d/10periodic
 #SSH
     - name: Change ssh port
       lineinfile: dest=/etc/ssh/sshd_config
@@ -133,13 +133,13 @@
     - name: Configure Fail2Ban
       notify: Restart fail2ban
       template:
-        src: conf/fail2ban/jail.local
+        src: files/fail2ban/jail.local
         dest: /etc/fail2ban/jail.local
 
     - name: Add fail2ban action for ufw-ssh
       notify: Restart fail2ban
       copy:
-        src: conf/fail2ban/action.d/ufw-ssh.conf
+        src: files/fail2ban/action.d/ufw-ssh.conf
         dest: /etc/fail2ban/action.d/ufw-ssh.conf
 
 # Postfix
