@@ -1,0 +1,11 @@
+---
+# - name: Secure your server
+#   hosts: all
+#   become: 'yes'
+#   become_method: sudo
+- name: Restart ssh
+  service: name=ssh state=restarted
+- name: Restart postfix
+  service: name=postfix state=restarted
+- name: Restart fail2ban
+  service: name=fail2ban state=restarted

@@ -35,7 +35,7 @@ banaction = ufw
 [ssh]
 enabled = true
 banaction = ufw-ssh
-port = {{ ubuntu_ssh_port }}
+port = {{ ubuntu_secure_ssh_port }}
 filter = sshd
 logpath = /var/log/auth.log
 maxretry = 3

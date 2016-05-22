@@ -1,0 +1,10 @@
+---
+ubuntu_insecure_ssh_port: 22 #By default we only expect to run this on a new server, override if necessary
+ubuntu_secure_ssh_port: 21222
+sudoers:
+  - deploy
+ubuntu_common_required_packages:     
+  - ufw
+  - fail2ban
+  - unattended-upgrades
+  - logwatch
