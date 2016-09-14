@@ -11,7 +11,7 @@
     cache_valid_time: 3600
 
 - name: apt-get upgrade
-  shell: apt-get -y upgrade
+  shell: apt-get -o Dpkg::Options::="--force-confnew" -y upgrade
 
 - name: Make sure we have a 'wheel' group
   group:
@@ -101,25 +101,6 @@
               line="X11Forwarding no"
               state=present
   notify: Restart ssh
-#Firewall
-- name: Setup ufw
-  ufw: state=enabled policy=deny
-
-- name: Allow ssh traffic
-  ufw: rule=allow port={{ ubuntu_secure_ssh_port }} proto=tcp
-
-#Fail2Ban
-- name: Configure Fail2Ban
-  notify: Restart fail2ban
-  template:
-    src: files/fail2ban/jail.local
-    dest: /etc/fail2ban/jail.local
-
-- name: Add fail2ban action for ufw-ssh
-  notify: Restart fail2ban
-  copy:
-    src: files/fail2ban/action.d/ufw-ssh.conf
-    dest: /etc/fail2ban/action.d/ufw-ssh.conf
 
 # Postfix
 - name: Set up Postfix to relay mail
@@ -140,7 +121,6 @@
               state=present
   notify: Restart postfix
   when: ubuntu_logwatch_email is defined
-
 #Logwatch
 - name: Email log summary daily
   lineinfile: dest=/etc/cron.daily/00logwatch
@@ -148,4 +128,28 @@
               line="/usr/sbin/logwatch --output mail --mailto {{ ubuntu_logwatch_email }} --detail high --format html "
               state=present create=yes
   when: ubuntu_logwatch_email is defined
+
+#Firewall
+
+- name: Allow ssh traffic
+  ufw: rule=allow port={{ ubuntu_secure_ssh_port }} proto=tcp
+- name: Allow ssh traffic for current session so firewall doesn kill session
+  ufw: rule=allow port={{ ansible_env['SSH_CLIENT'].split()[1] }} proto=tcp from={{ ansible_env['SSH_CLIENT'].split()[0] }}
+- name: Allow ssh traffic for current session so firewall doesn kill session
+  ufw: rule=allow port={{ ansible_env['SSH_CLIENT'].split()[2] }} proto=tcp from={{ ansible_env['SSH_CLIENT'].split()[0] }}
+- name: Setup ufw
+  ufw: state=enabled policy=deny
+
+#Fail2Ban
+- name: Configure Fail2Ban
+  notify: Restart fail2ban
+  template:
+    src: files/fail2ban/jail.local
+    dest: /etc/fail2ban/jail.local
+
+- name: Add fail2ban action for ufw-ssh
+  notify: Restart fail2ban
+  copy:
+    src: files/fail2ban/action.d/ufw-ssh.conf
+    dest: /etc/fail2ban/action.d/ufw-ssh.conf
 
